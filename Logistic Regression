@@ -1,0 +1,113 @@
+# Import packages for data preprocessing
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.utils import resample
+
+# Import packages for data modeling
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+# Get data types of columns
+data.dtypes
+
+# Check for duplicates
+data.duplicated().sum()
+
+# Check for and handle outliers
+# Create a boxplot to visualize distribution of `video_duration_sec`
+plt.title('video_duration_sec boxplot')
+sns.boxplot(x = data['video_duration_sec']);
+# Create a boxplot to visualize distribution of `video_view_count`
+plt.title('video_view_count boxplot')
+sns.boxplot(x = data['video_view_count']);
+# Create a boxplot to visualize distribution of `video_like_count`
+plt.title('video_like_count boxplot')
+sns.boxplot(x = data['video_like_count']);
+# Create a boxplot to visualize distribution of `video_comment_count`
+plt.title('video_comment_count boxplot')
+sns.boxplot(x = data['video_comment_count']);
+# Check for and handle outliers for video_like_count
+perc25 = data['video_like_count'].quantile(0.25)
+perc75 = data['video_like_count'].quantile(0.75)
+iqr = perc75 - perc25
+upper_limit = perc75 + 1.5*iqr
+lower_limit = perc25 - 1.5*iqr
+data[data['video_like_count'] > upper_limit]
+
+# Check class balance for verified_status
+data['verified_status'].value_counts(normalize = True)*100
+# Approximately 93.7% of the dataset is represented by videos posted by 'not verified' accounts while only about 6.3% is represented by videos posted by 'verified' accounts.
+# There is class imbalance and resampling is needed to create class balance in the outcome variable.
+
+# Use resampling to create class balance in the outcome variable
+# Identify data points from majority and minority classes
+data_majority = data[data['verified_status'] == 'not verified']
+data_minority = data[data['verified_status'] == 'verified']
+# Upsample the minority class (which is "verified")
+data_minority_upsampled = resample(data_minority,
+                                 replace = True,                 
+                                 n_samples = len(data_majority), 
+                                 random_state = 0) 
+# Combine majority class with upsampled minority class
+data_upsampled = pd.concat([data_majority, data_minority_upsampled]).reset_index(drop = True)
+# Display new class counts
+data_upsampled['verified_status'].value_counts()
+# Both counts should be the same.
+
+# Get the average `video_transcription_text` length for verified and the average `video_transcription_text` length for not verified
+data_upsampled[['verified_status', 'video_transcription_text']].groupby(by = 'verified_status')[['video_transcription_text']].agg(func = lambda array: np.mean([len(text) for text in array]))
+
+# Extract the length of each `video_transcription_text` and add this as a column to the dataframe
+data_upsampled['text_length'] = data_upsampled['video_transcription_text'].apply(func = lambda text: len(text))
+
+# Display first few rows of dataframe after adding new column
+data_upsampled.head()
+
+# Visualize the distribution of `video_transcription_text` length for videos posted by verified accounts and unverified accounts
+# Create two histograms in one plot
+sns.histplot(data = data_upsampled, stat = 'count', multiple  = 'stack', x = 'text_length', kde = False, hue = 'verified_status', legend = True)
+plt.xlabel('video_transcription_text length (number of characters)')
+plt.ylabel('Count')
+plt.title('Distribution of video_transcription_text length for videos posted by verified accounts and videos posted by unverified accounts')
+plt.show()
+
+# Code a correlation matrix to help determine most correlated variables
+data_upsampled.corr(numeric_only = True)
+
+# Create a heatmap to visualize how correlated variables are
+sns.heatmap(data_upsampled[['video_duration_sec', 'claim_status', 'author_ban_status', 'video_view_count', 'video_like_count',
+                            'video_share_count', 'video_download_count', 'video_comment_count', 'text_length']].corr(numeric_only=True),
+                            annot = True, cmap = 'crest')
+plt.title('Correlation heatmap')
+plt.show()
+
+# Select outcome variable
+y = data_upsampled['verified_status']
+
+# Select features
+X = data_upsampled[['video_duration_sec', 'video_view_count', 'video_share_count', 'video_download_count', 'video_comment_count', 'claim_status', 'author_ban_status']]
+# video_like_count has the most severe collinearity with the other features, thus is not selected as a feature.
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 42)
+
+# Get shape of each training and testing set
+print(X_train.shape)
+print(X_test.shape)
+print(y_train.shape)
+print(y_test.shape)
+
+# Check data types
+X.dtypes
+# Get unique values in `claim_status`
+X['claim_status'].unique()
+# Get unique values in `author_ban_status`
+X['author_ban_status'].unique()
+# Both claim_status and author_ban_status are of the object data type. They will have to be converted to numeric data type in order for it to work with sklearn. We will do this through one-hot encoding.
+
+# Select the training features that needs to be encoded
+X_train_to_encode = X_train[['claim_status', 'author_ban_status']]
+# Set up an encoder for one-hot encoding the categorical features
+X_encoder = OneHotEncoder(drop = 'first', sparse_output = False)
