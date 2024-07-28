@@ -1,4 +1,5 @@
 # Classification of TikTok video reports
+**Disclaimer:** This project was part of the Google Advanced Data Analytics Specialisation on Coursera, and was completed with their guidance.
 
 ## Overview
 The goal of this project was to build a logistic regression model using verified status to help us understand how video characteristics relate to verified users. The project utilized synthetic data created for this project in partnership with TikTok. The final logistic regression model performed with 66% accuracy and 61% precision when predicting the 'not verified' class.
